@@ -1,6 +1,7 @@
 const setupPanel = document.getElementById("setupPanel");
 const gamePanel = document.getElementById("gamePanel");
 const setupForm = document.getElementById("setupForm");
+const clearStorageBtn = document.getElementById("clearStorageBtn");
 const playerCountInput = document.getElementById("playerCount");
 const playersFields = document.getElementById("playersFields");
 const categoryCountInput = document.getElementById("categoryCount");
@@ -20,10 +21,8 @@ const startTimerBtn = document.getElementById("startTimerBtn");
 const pauseTimerBtn = document.getElementById("pauseTimerBtn");
 const resetTimerBtn = document.getElementById("resetTimerBtn");
 const scoreBoard = document.getElementById("scoreBoard");
-const sandTop = document.getElementById("sandTop");
-const sandBottom = document.getElementById("sandBottom");
-const sandStream = document.getElementById("sandStream");
-const hourglass = sandStream.parentElement;
+const vesselLiquid = document.getElementById("vesselLiquid");
+const timerVessel = document.getElementById("timerVessel");
 
 const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
@@ -97,10 +96,11 @@ let timerInterval = null;
 let isTimerRunning = false;
 let timerDuration = 60;
 let timeLeft = timerDuration;
-let warningPlayed = false;
+let warningSongInterval = null;
 let audioContext = null;
+const STORAGE_KEY = "petit-bac-helper-state-v1";
 
-function createPlayerInputs() {
+function createPlayerInputs(prefilledNames = []) {
   const count = Math.max(1, parseInt(playerCountInput.value || "1", 10));
   playersFields.innerHTML = "";
 
@@ -115,7 +115,7 @@ function createPlayerInputs() {
     input.type = "text";
     input.maxLength = 30;
     input.required = true;
-    input.value = `Joueur ${i}`;
+    input.value = prefilledNames[i - 1] || `Joueur ${i}`;
 
     wrapper.append(label, input);
     playersFields.appendChild(wrapper);
@@ -176,17 +176,17 @@ function initAudio() {
   }
 }
 
-function playWarningSong() {
-  if (!audioContext) return;
+function playMelodyStep() {
+  if (!audioContext || timeLeft > 15 || timeLeft <= 0) return;
   const start = audioContext.currentTime;
-  const notes = [523.25, 659.25, 783.99, 659.25, 523.25];
+  const notes = [659.25, 587.33, 523.25, 587.33];
   notes.forEach((freq, i) => {
     const osc = audioContext.createOscillator();
     const gain = audioContext.createGain();
     osc.type = "triangle";
     osc.frequency.value = freq;
     gain.gain.setValueAtTime(0.0001, start + i * 0.2);
-    gain.gain.exponentialRampToValueAtTime(0.18, start + i * 0.2 + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.12, start + i * 0.2 + 0.03);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + i * 0.2 + 0.18);
     osc.connect(gain).connect(audioContext.destination);
     osc.start(start + i * 0.2);
@@ -194,30 +194,45 @@ function playWarningSong() {
   });
 }
 
-function playCymbalSound() {
+function startWarningMelodyLoop() {
+  if (warningSongInterval || timeLeft > 15 || timeLeft <= 0) return;
+  playMelodyStep();
+  warningSongInterval = setInterval(() => {
+    playMelodyStep();
+  }, 800);
+}
+
+function stopWarningMelodyLoop() {
+  clearInterval(warningSongInterval);
+  warningSongInterval = null;
+}
+
+function playGongSound() {
   if (!audioContext) return;
-  const duration = 1.1;
+  const duration = 2.6;
   const sampleRate = audioContext.sampleRate;
   const bufferSize = sampleRate * duration;
   const buffer = audioContext.createBuffer(1, bufferSize, sampleRate);
   const data = buffer.getChannelData(0);
 
   for (let i = 0; i < bufferSize; i += 1) {
-    const decay = 1 - i / bufferSize;
-    data[i] = (Math.random() * 2 - 1) * decay * decay;
+    const t = i / sampleRate;
+    const decay = Math.exp(-t * 1.4);
+    const tone = Math.sin(2 * Math.PI * 180 * t) + 0.6 * Math.sin(2 * Math.PI * 240 * t);
+    const shimmer = (Math.random() * 2 - 1) * 0.2;
+    data[i] = (tone + shimmer) * decay * 0.45;
   }
 
   const src = audioContext.createBufferSource();
   src.buffer = buffer;
-
-  const highPass = audioContext.createBiquadFilter();
-  highPass.type = "highpass";
-  highPass.frequency.value = 3200;
+  const lowPass = audioContext.createBiquadFilter();
+  lowPass.type = "lowpass";
+  lowPass.frequency.value = 1300;
 
   const gain = audioContext.createGain();
-  gain.gain.value = 0.45;
+  gain.gain.value = 0.65;
 
-  src.connect(highPass).connect(gain).connect(audioContext.destination);
+  src.connect(lowPass).connect(gain).connect(audioContext.destination);
   src.start();
 }
 
@@ -240,17 +255,14 @@ function formatTime(totalSeconds) {
   return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
-function updateHourglass() {
-  const ratio = timerDuration > 0 ? timeLeft / timerDuration : 0;
-  const topHeight = Math.max(8, ratio * 74);
-  const bottomHeight = Math.max(10, (1 - ratio) * 74);
-  sandTop.style.height = `${topHeight}px`;
-  sandBottom.style.height = `${bottomHeight}px`;
+function updateVesselFill() {
+  const ratio = timerDuration > 0 ? 1 - timeLeft / timerDuration : 1;
+  vesselLiquid.style.height = `${Math.min(100, Math.max(0, ratio * 100))}%`;
 }
 
 function refreshTimerUI() {
   timeReadout.textContent = formatTime(timeLeft);
-  updateHourglass();
+  updateVesselFill();
 }
 
 function startTimer() {
@@ -260,20 +272,19 @@ function startTimer() {
     audioContext.resume();
   }
   isTimerRunning = true;
-  hourglass.classList.add("flowing");
+  timerVessel.classList.add("flowing");
 
   timerInterval = setInterval(() => {
     timeLeft = Math.max(0, timeLeft - 1);
     refreshTimerUI();
 
-    if (timeLeft === 15 && !warningPlayed) {
-      warningPlayed = true;
-      playWarningSong();
+    if (timeLeft <= 15 && timeLeft > 0) {
+      startWarningMelodyLoop();
     }
 
     if (timeLeft === 0) {
       stopTimer();
-      playCymbalSound();
+      playGongSound();
     }
   }, 1000);
 }
@@ -282,21 +293,111 @@ function stopTimer() {
   isTimerRunning = false;
   clearInterval(timerInterval);
   timerInterval = null;
-  hourglass.classList.remove("flowing");
+  stopWarningMelodyLoop();
+  timerVessel.classList.remove("flowing");
 }
 
 function setDuration(seconds) {
   timerDuration = Math.max(5, seconds);
   timeLeft = timerDuration;
-  warningPlayed = false;
   stopTimer();
   refreshTimerUI();
+  persistState();
 }
 
 function updateScore(name, delta) {
   gameState.scores[name] += delta;
   const scoreSpan = document.getElementById(`score-${cssSafeId(name)}`);
   scoreSpan.textContent = String(gameState.scores[name]);
+  persistState();
+}
+
+function getPersistedState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistState() {
+  const payload = {
+    difficulty: gameState.difficulty,
+    categoryCount: gameState.categoryCount,
+    players: gameState.players,
+    scores: gameState.scores,
+    selectedCategories: gameState.selectedCategories,
+    timerDuration
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+}
+
+function hydrateFromStorage() {
+  const saved = getPersistedState();
+  if (!saved) return;
+
+  const safePlayers = Array.isArray(saved.players) ? saved.players.filter(Boolean) : [];
+  const safeScores = saved.scores && typeof saved.scores === "object" ? saved.scores : {};
+  const safeDifficulty = [1, 2, 3].includes(saved.difficulty) ? saved.difficulty : 1;
+  const safeCategoryCount = Math.max(3, Number(saved.categoryCount) || 5);
+  const safeDuration = Math.max(5, Number(saved.timerDuration) || 60);
+
+  difficultySelect.value = String(safeDifficulty);
+  categoryCountInput.value = String(safeCategoryCount);
+  playerCountInput.value = String(Math.max(1, safePlayers.length || 2));
+  createPlayerInputs(safePlayers);
+
+  gameState.difficulty = safeDifficulty;
+  gameState.categoryCount = safeCategoryCount;
+  gameState.players = safePlayers;
+  gameState.scores = Object.fromEntries(
+    safePlayers.map((name) => [name, Number(safeScores[name] ?? 0)])
+  );
+  gameState.selectedCategories = Array.isArray(saved.selectedCategories) ? saved.selectedCategories : [];
+
+  setDuration(safeDuration);
+  durationPreset.value = String(safeDuration);
+  minutesInput.value = String(Math.floor(safeDuration / 60));
+  secondsInput.value = String(safeDuration % 60);
+
+  if (gameState.players.length > 0) {
+    categoriesList.innerHTML = gameState.selectedCategories
+      .map((cat) => `<li>${cat}</li>`)
+      .join("");
+    renderScoreboard();
+    setupPanel.classList.remove("active");
+    gamePanel.classList.add("active");
+  }
+}
+
+function clearSavedGame() {
+  const confirmed = window.confirm("Effacer la sauvegarde locale et remettre la partie a zero ?");
+  if (!confirmed) return;
+
+  localStorage.removeItem(STORAGE_KEY);
+  stopTimer();
+  stopLetterShuffle();
+  gameState = {
+    players: [],
+    difficulty: 1,
+    categoryCount: 5,
+    scores: {},
+    selectedCategories: []
+  };
+  difficultySelect.value = "1";
+  categoryCountInput.value = "5";
+  playerCountInput.value = "2";
+  createPlayerInputs();
+  categoriesList.innerHTML = "";
+  scoreBoard.innerHTML = "";
+  durationPreset.value = "60";
+  minutesInput.value = "1";
+  secondsInput.value = "0";
+  setDuration(60);
+  letterDisplay.textContent = "A";
+  gamePanel.classList.remove("active");
+  setupPanel.classList.add("active");
 }
 
 playerCountInput.addEventListener("change", createPlayerInputs);
@@ -324,12 +425,14 @@ setupForm.addEventListener("submit", (event) => {
 
   pickCategories();
   renderScoreboard();
+  persistState();
   setupPanel.classList.remove("active");
   gamePanel.classList.add("active");
 });
 
 newRoundBtn.addEventListener("click", () => {
   pickCategories();
+  persistState();
   setDuration(timerDuration);
   launchLetterShuffle();
   setTimeout(stopLetterShuffle, 1300);
@@ -338,6 +441,7 @@ newRoundBtn.addEventListener("click", () => {
 editSetupBtn.addEventListener("click", () => {
   stopTimer();
   stopLetterShuffle();
+  persistState();
   gamePanel.classList.remove("active");
   setupPanel.classList.add("active");
 });
@@ -368,6 +472,8 @@ scoreBoard.addEventListener("click", (event) => {
   if (!btn) return;
   updateScore(btn.dataset.name, Number(btn.dataset.delta));
 });
+clearStorageBtn.addEventListener("click", clearSavedGame);
 
 createPlayerInputs();
 setDuration(timerDuration);
+hydrateFromStorage();

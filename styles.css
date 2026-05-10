@@ -1,14 +1,15 @@
 :root {
-  --bg: #0e1325;
-  --surface: #171f3b;
-  --surface-soft: #202a4f;
-  --text: #f4f7ff;
-  --muted: #b6c1e8;
-  --accent: #6f95ff;
-  --accent-2: #59d7c4;
-  --danger: #ff6f8e;
+  --bg: #f6ecd8;
+  --board: #e2bb84;
+  --surface: #fff8ec;
+  --surface-soft: #f4dfbd;
+  --text: #332317;
+  --muted: #6f5741;
+  --accent: #af3b3b;
+  --accent-2: #496f4d;
+  --danger: #5b4ba1;
   --radius: 16px;
-  --shadow: 0 18px 30px rgba(0, 0, 0, 0.24);
+  --shadow: 0 10px 0 #8a653e, 0 18px 26px rgba(68, 40, 13, 0.24);
 }
 
 * {
@@ -17,9 +18,12 @@
 
 body {
   margin: 0;
-  font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family: "Trebuchet MS", "Segoe UI", Roboto, Arial, sans-serif;
   color: var(--text);
-  background: radial-gradient(circle at 20% 20%, #1a2852 0%, var(--bg) 52%);
+  background:
+    radial-gradient(circle at 20% 15%, #ffffff80 0%, transparent 40%),
+    radial-gradient(circle at 80% 80%, #d39f5f5b 0%, transparent 40%),
+    var(--bg);
   min-height: 100vh;
 }
 
@@ -51,7 +55,7 @@ body {
 .grid-form,
 .card {
   background: linear-gradient(160deg, var(--surface), var(--surface-soft));
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 2px solid #b37f4f;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
@@ -70,10 +74,10 @@ label {
 input,
 select {
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 2px solid #ceaa7c;
   border-radius: 10px;
   padding: 10px 12px;
-  background: rgba(10, 15, 35, 0.55);
+  background: #fffcf4;
   color: var(--text);
   font-size: 1rem;
 }
@@ -99,18 +103,18 @@ select {
 }
 
 .btn.primary {
-  color: white;
-  background: linear-gradient(120deg, var(--accent), #89a7ff);
+  color: #fffaf4;
+  background: linear-gradient(120deg, var(--accent), #dc6161);
 }
 
 .btn.ghost {
-  background: rgba(255, 255, 255, 0.12);
+  background: #f2debc;
   color: var(--text);
 }
 
 .btn.danger {
-  background: linear-gradient(120deg, var(--danger), #ff90a8);
-  color: #250611;
+  background: linear-gradient(120deg, var(--danger), #8f80d3);
+  color: #fff;
 }
 
 .top-actions {
@@ -153,9 +157,9 @@ select {
   place-content: center;
   font-size: clamp(3rem, 10vw, 5rem);
   font-weight: 900;
-  background: radial-gradient(circle, #84ffec 0%, #7ca1ff 100%);
-  color: #151929;
-  box-shadow: inset 0 0 24px rgba(255, 255, 255, 0.4), 0 10px 25px rgba(0, 0, 0, 0.3);
+  background: radial-gradient(circle, #ffe87e 0%, #ffb66f 100%);
+  color: #432918;
+  box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.5), 0 8px 18px rgba(68, 40, 13, 0.28);
 }
 
 .letter-actions,
@@ -175,76 +179,104 @@ select {
   letter-spacing: 1px;
 }
 
-.hourglass {
-  margin: 4px auto 18px;
-  width: 120px;
-  height: 220px;
+.timer-vessel {
   position: relative;
+  width: 130px;
+  height: 190px;
+  margin: 8px auto 18px;
+  border: 6px solid #7c5230;
+  border-radius: 24px 24px 28px 28px;
+  background: linear-gradient(180deg, #fff8eb, #f5ddb8);
+  overflow: hidden;
 }
 
-.glass {
+.vessel-scale {
   position: absolute;
-  width: 100%;
-  height: 45%;
-  border: 3px solid #e9f0ff;
-  border-radius: 60px;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      to top,
+      transparent 0,
+      transparent 14%,
+      rgba(124, 82, 48, 0.2) 14%,
+      rgba(124, 82, 48, 0.2) 15%
+    );
+  pointer-events: none;
+}
+
+.vessel-liquid {
+  position: absolute;
   left: 0;
-}
-
-.glass.top {
-  top: 0;
-  clip-path: polygon(0 0, 100% 0, 58% 100%, 42% 100%);
-}
-
-.glass.bottom {
+  right: 0;
   bottom: 0;
-  clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%);
-}
-
-.sand {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 74px;
-  background: linear-gradient(180deg, #ffd57b, #ffb969);
+  height: 0%;
+  background: linear-gradient(180deg, #80b4ff, #4f74d9);
   transition: height 0.2s linear;
 }
 
-.top-sand {
-  top: 24px;
-  height: 74px;
-  clip-path: polygon(0 0, 100% 0, 58% 100%, 42% 100%);
-}
-
-.bottom-sand {
-  bottom: 22px;
-  height: 10px;
-  clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%);
-}
-
-.sand-stream {
+.vessel-liquid::before {
+  content: "";
   position: absolute;
-  left: 50%;
-  top: 98px;
-  transform: translateX(-50%);
-  width: 7px;
-  height: 26px;
-  background: #ffcb6f;
-  opacity: 0;
-  border-radius: 8px;
+  left: -10%;
+  right: -10%;
+  top: -8px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(171, 209, 255, 0.9);
+  animation: wave 1.4s ease-in-out infinite;
 }
 
-.hourglass.flowing .sand-stream {
-  opacity: 1;
-  animation: flow 0.12s linear infinite alternate;
+.timer-vessel.flowing .vessel-liquid::before {
+  animation-duration: 0.5s;
 }
 
-@keyframes flow {
+.vessel-bubbles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.timer-vessel.flowing .vessel-bubbles::before,
+.timer-vessel.flowing .vessel-bubbles::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.8);
+  animation: bubble 1.2s linear infinite;
+}
+
+.timer-vessel.flowing .vessel-bubbles::before {
+  left: 30px;
+}
+
+.timer-vessel.flowing .vessel-bubbles::after {
+  right: 28px;
+  animation-delay: 0.5s;
+}
+
+@keyframes bubble {
   from {
-    transform: translateX(-50%) scaleY(0.84);
+    transform: translateY(0) scale(0.8);
+    opacity: 0.9;
   }
   to {
-    transform: translateX(-50%) scaleY(1.06);
+    transform: translateY(-140px) scale(1.2);
+    opacity: 0;
+  }
+}
+
+@keyframes wave {
+  0% {
+    transform: translateX(-3px);
+  }
+  50% {
+    transform: translateX(3px);
+  }
+  100% {
+    transform: translateX(-3px);
   }
 }
 
@@ -259,8 +291,8 @@ select {
 }
 
 .player-score {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #f7e7cc;
+  border: 2px solid #d2a56e;
   border-radius: 12px;
   padding: 10px;
   display: grid;

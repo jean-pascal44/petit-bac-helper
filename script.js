@@ -20,6 +20,7 @@ const timeReadout = document.getElementById("timeReadout");
 const startTimerBtn = document.getElementById("startTimerBtn");
 const pauseTimerBtn = document.getElementById("pauseTimerBtn");
 const resetTimerBtn = document.getElementById("resetTimerBtn");
+const resetScoresBtn = document.getElementById("resetScoresBtn");
 const scoreBoard = document.getElementById("scoreBoard");
 const vesselLiquid = document.getElementById("vesselLiquid");
 const timerVessel = document.getElementById("timerVessel");
@@ -297,12 +298,15 @@ function stopTimer() {
   timerVessel.classList.remove("flowing");
 }
 
-function setDuration(seconds) {
+function setDuration(seconds, options = {}) {
+  const { persist = true } = options;
   timerDuration = Math.max(5, seconds);
   timeLeft = timerDuration;
   stopTimer();
   refreshTimerUI();
-  persistState();
+  if (persist) {
+    persistState();
+  }
 }
 
 function updateScore(name, delta) {
@@ -356,7 +360,7 @@ function hydrateFromStorage() {
   );
   gameState.selectedCategories = Array.isArray(saved.selectedCategories) ? saved.selectedCategories : [];
 
-  setDuration(safeDuration);
+  setDuration(safeDuration, { persist: false });
   durationPreset.value = String(safeDuration);
   minutesInput.value = String(Math.floor(safeDuration / 60));
   secondsInput.value = String(safeDuration % 60);
@@ -400,6 +404,16 @@ function clearSavedGame() {
   setupPanel.classList.add("active");
 }
 
+function resetScores() {
+  if (gameState.players.length === 0) return;
+  const confirmed = window.confirm("Remettre tous les scores a zero ?");
+  if (!confirmed) return;
+
+  gameState.scores = Object.fromEntries(gameState.players.map((name) => [name, 0]));
+  renderScoreboard();
+  persistState();
+}
+
 playerCountInput.addEventListener("change", createPlayerInputs);
 playerCountInput.addEventListener("input", createPlayerInputs);
 
@@ -415,12 +429,16 @@ setupForm.addEventListener("submit", (event) => {
 
   if (playerNames.length === 0) return;
 
+  const previousScores = gameState.scores || {};
   gameState = {
     ...gameState,
     difficulty,
     categoryCount,
     players: playerNames,
-    scores: Object.fromEntries(playerNames.map((name) => [name, 0]))
+    // Keep known scores for unchanged names, initialize only new players.
+    scores: Object.fromEntries(
+      playerNames.map((name) => [name, Number(previousScores[name] ?? 0)])
+    )
   };
 
   pickCategories();
@@ -473,7 +491,8 @@ scoreBoard.addEventListener("click", (event) => {
   updateScore(btn.dataset.name, Number(btn.dataset.delta));
 });
 clearStorageBtn.addEventListener("click", clearSavedGame);
+resetScoresBtn.addEventListener("click", resetScores);
 
 createPlayerInputs();
-setDuration(timerDuration);
+setDuration(timerDuration, { persist: false });
 hydrateFromStorage();

@@ -249,10 +249,10 @@ function playLetterShuffleStep() {
   if (!audioContext) return;
   const now = audioContext.currentTime;
 
-  const noiseBuffer = audioContext.createBuffer(1, Math.floor(audioContext.sampleRate * 0.08), audioContext.sampleRate);
+  const noiseBuffer = audioContext.createBuffer(1, Math.floor(audioContext.sampleRate * 0.055), audioContext.sampleRate);
   const channel = noiseBuffer.getChannelData(0);
   for (let i = 0; i < channel.length; i += 1) {
-    channel[i] = (Math.random() * 2 - 1) * 0.45;
+    channel[i] = (Math.random() * 2 - 1) * 0.38;
   }
 
   const source = audioContext.createBufferSource();
@@ -260,17 +260,34 @@ function playLetterShuffleStep() {
 
   const bandpass = audioContext.createBiquadFilter();
   bandpass.type = "bandpass";
-  bandpass.frequency.setValueAtTime(1700, now);
-  bandpass.Q.value = 1.4;
+  bandpass.frequency.setValueAtTime(2450, now);
+  bandpass.Q.value = 2.2;
+
+  const highpass = audioContext.createBiquadFilter();
+  highpass.type = "highpass";
+  highpass.frequency.value = 1200;
 
   const gain = audioContext.createGain();
   gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(0.05, now + 0.006);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+  gain.gain.exponentialRampToValueAtTime(0.065, now + 0.004);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
 
-  source.connect(bandpass).connect(gain).connect(audioContext.destination);
+  const clickOsc = audioContext.createOscillator();
+  clickOsc.type = "square";
+  clickOsc.frequency.setValueAtTime(2600, now);
+  clickOsc.frequency.exponentialRampToValueAtTime(1600, now + 0.03);
+
+  const clickGain = audioContext.createGain();
+  clickGain.gain.setValueAtTime(0.0001, now);
+  clickGain.gain.exponentialRampToValueAtTime(0.025, now + 0.002);
+  clickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.03);
+
+  source.connect(bandpass).connect(highpass).connect(gain).connect(audioContext.destination);
+  clickOsc.connect(clickGain).connect(audioContext.destination);
   source.start(now);
-  source.stop(now + 0.09);
+  clickOsc.start(now);
+  source.stop(now + 0.06);
+  clickOsc.stop(now + 0.035);
 }
 
 function startLetterShuffleSoundLoop() {
@@ -278,7 +295,7 @@ function startLetterShuffleSoundLoop() {
   playLetterShuffleStep();
   letterShuffleSoundInterval = setInterval(() => {
     playLetterShuffleStep();
-  }, 95);
+  }, 78);
 }
 
 function stopLetterShuffleSoundLoop() {

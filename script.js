@@ -29,6 +29,9 @@ const confirmModalTitle = document.getElementById("confirmModalTitle");
 const confirmModalMessage = document.getElementById("confirmModalMessage");
 const confirmCancelBtn = document.getElementById("confirmCancelBtn");
 const confirmAcceptBtn = document.getElementById("confirmAcceptBtn");
+const updateToast = document.getElementById("updateToast");
+const updateLaterBtn = document.getElementById("updateLaterBtn");
+const updateNowBtn = document.getElementById("updateNowBtn");
 
 const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
@@ -108,6 +111,8 @@ let audioContext = null;
 let letterShuffleSoundInterval = null;
 const STORAGE_KEY = "petit-bac-helper-state-v1";
 let resolveConfirmModal = null;
+let pendingServiceWorker = null;
+let isReloadingForUpdate = false;
 
 function createPlayerInputs(prefilledNames = []) {
   const count = Math.max(1, parseInt(playerCountInput.value || "1", 10));
@@ -453,11 +458,49 @@ function closeConfirmModal(accepted) {
   resolver(accepted);
 }
 
+function showUpdateToast(waitingWorker) {
+  if (!updateToast || !waitingWorker) return;
+  pendingServiceWorker = waitingWorker;
+  updateToast.classList.add("open");
+  updateToast.setAttribute("aria-hidden", "false");
+}
+
+function hideUpdateToast() {
+  pendingServiceWorker = null;
+  if (!updateToast) return;
+  updateToast.classList.remove("open");
+  updateToast.setAttribute("aria-hidden", "true");
+}
+
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {
-      // Silently ignore registration errors in local dev.
+    navigator.serviceWorker
+      .register("./sw.js")
+      .then((registration) => {
+        if (registration.waiting) {
+          showUpdateToast(registration.waiting);
+        }
+
+        registration.addEventListener("updatefound", () => {
+          const newWorker = registration.installing;
+          if (!newWorker) return;
+
+          newWorker.addEventListener("statechange", () => {
+            if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+              showUpdateToast(newWorker);
+            }
+          });
+        });
+      })
+      .catch(() => {
+        // Silently ignore registration errors in local dev.
+      });
+
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (isReloadingForUpdate) return;
+      isReloadingForUpdate = true;
+      window.location.reload();
     });
   });
 }
@@ -640,6 +683,12 @@ scoreBoard.addEventListener("click", (event) => {
 });
 clearStorageBtn.addEventListener("click", clearSavedGame);
 resetScoresBtn.addEventListener("click", resetScores);
+updateLaterBtn.addEventListener("click", hideUpdateToast);
+updateNowBtn.addEventListener("click", () => {
+  if (!pendingServiceWorker) return;
+  pendingServiceWorker.postMessage({ type: "SKIP_WAITING" });
+  hideUpdateToast();
+});
 confirmCancelBtn.addEventListener("click", () => closeConfirmModal(false));
 confirmAcceptBtn.addEventListener("click", () => closeConfirmModal(true));
 confirmModal.addEventListener("click", (event) => {

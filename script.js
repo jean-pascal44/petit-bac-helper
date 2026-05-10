@@ -1,0 +1,373 @@
+const setupPanel = document.getElementById("setupPanel");
+const gamePanel = document.getElementById("gamePanel");
+const setupForm = document.getElementById("setupForm");
+const playerCountInput = document.getElementById("playerCount");
+const playersFields = document.getElementById("playersFields");
+const categoryCountInput = document.getElementById("categoryCount");
+const difficultySelect = document.getElementById("difficulty");
+const categoriesList = document.getElementById("categoriesList");
+const newRoundBtn = document.getElementById("newRoundBtn");
+const editSetupBtn = document.getElementById("editSetupBtn");
+const letterDisplay = document.getElementById("letterDisplay");
+const startLetterBtn = document.getElementById("startLetterBtn");
+const stopLetterBtn = document.getElementById("stopLetterBtn");
+const durationPreset = document.getElementById("durationPreset");
+const minutesInput = document.getElementById("minutesInput");
+const secondsInput = document.getElementById("secondsInput");
+const applyDurationBtn = document.getElementById("applyDurationBtn");
+const timeReadout = document.getElementById("timeReadout");
+const startTimerBtn = document.getElementById("startTimerBtn");
+const pauseTimerBtn = document.getElementById("pauseTimerBtn");
+const resetTimerBtn = document.getElementById("resetTimerBtn");
+const scoreBoard = document.getElementById("scoreBoard");
+const sandTop = document.getElementById("sandTop");
+const sandBottom = document.getElementById("sandBottom");
+const sandStream = document.getElementById("sandStream");
+const hourglass = sandStream.parentElement;
+
+const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+const categoriesByDifficulty = {
+  1: [
+    "Prenom",
+    "Ville",
+    "Pays",
+    "Animal",
+    "Couleur",
+    "Fruit",
+    "Legume",
+    "Metier",
+    "Objet de la maison",
+    "Marque connue",
+    "Sport",
+    "Musique ou groupe",
+    "Film",
+    "Serie TV",
+    "Boisson",
+    "Fleur"
+  ],
+  2: [
+    "Personnage historique",
+    "Element de cuisine",
+    "Type de danse",
+    "Montagne",
+    "Matiere scolaire",
+    "Verbe d'action",
+    "Emotion",
+    "Vehicule",
+    "Outil",
+    "Plante aromatique",
+    "Monument",
+    "Jeu video",
+    "Paysage naturel",
+    "Insecte",
+    "Marque de vetement",
+    "Type de livre"
+  ],
+  3: [
+    "Concept philosophique",
+    "Terme scientifique",
+    "Auteur litteraire",
+    "Mouvement artistique",
+    "Capitale peu connue",
+    "Materiau industriel",
+    "Instrument traditionnel",
+    "Constellation",
+    "Personnage mythologique",
+    "Courant musical niche",
+    "Peintre celebre",
+    "Chef cuisinier connu",
+    "Element chimique",
+    "Titre de poeme",
+    "Region viticole",
+    "Explorateur celebre"
+  ]
+};
+
+let gameState = {
+  players: [],
+  difficulty: 1,
+  categoryCount: 5,
+  scores: {},
+  selectedCategories: []
+};
+
+let letterInterval = null;
+let timerInterval = null;
+let isTimerRunning = false;
+let timerDuration = 60;
+let timeLeft = timerDuration;
+let warningPlayed = false;
+let audioContext = null;
+
+function createPlayerInputs() {
+  const count = Math.max(1, parseInt(playerCountInput.value || "1", 10));
+  playersFields.innerHTML = "";
+
+  for (let i = 1; i <= count; i += 1) {
+    const wrapper = document.createElement("div");
+    const label = document.createElement("label");
+    label.setAttribute("for", `player-${i}`);
+    label.textContent = `Nom du joueur ${i}`;
+
+    const input = document.createElement("input");
+    input.id = `player-${i}`;
+    input.type = "text";
+    input.maxLength = 30;
+    input.required = true;
+    input.value = `Joueur ${i}`;
+
+    wrapper.append(label, input);
+    playersFields.appendChild(wrapper);
+  }
+}
+
+function pickCategories() {
+  const difficulty = String(gameState.difficulty);
+  const pool = [...categoriesByDifficulty[difficulty]];
+  const wanted = Math.max(3, gameState.categoryCount);
+  const picked = [];
+
+  while (pool.length && picked.length < wanted) {
+    const index = Math.floor(Math.random() * pool.length);
+    picked.push(pool.splice(index, 1)[0]);
+  }
+
+  if (picked.length < wanted) {
+    const extraPools = Object.values(categoriesByDifficulty).flat();
+    while (picked.length < wanted) {
+      const fallback = extraPools[Math.floor(Math.random() * extraPools.length)];
+      if (!picked.includes(fallback)) {
+        picked.push(fallback);
+      }
+    }
+  }
+
+  gameState.selectedCategories = picked;
+  categoriesList.innerHTML = picked.map((cat) => `<li>${cat}</li>`).join("");
+}
+
+function renderScoreboard() {
+  scoreBoard.innerHTML = "";
+
+  gameState.players.forEach((name) => {
+    const card = document.createElement("div");
+    card.className = "player-score";
+    card.innerHTML = `
+      <strong>${name}</strong>
+      <div>Points: <span id="score-${cssSafeId(name)}">${gameState.scores[name]}</span></div>
+      <div class="score-controls">
+        <button class="btn ghost" data-name="${name}" data-delta="-1">-</button>
+        <button class="btn ghost" data-name="${name}" data-delta="1">+</button>
+      </div>
+    `;
+    scoreBoard.appendChild(card);
+  });
+}
+
+function cssSafeId(value) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+
+function initAudio() {
+  if (!audioContext) {
+    const Context = window.AudioContext || window.webkitAudioContext;
+    audioContext = Context ? new Context() : null;
+  }
+}
+
+function playWarningSong() {
+  if (!audioContext) return;
+  const start = audioContext.currentTime;
+  const notes = [523.25, 659.25, 783.99, 659.25, 523.25];
+  notes.forEach((freq, i) => {
+    const osc = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    osc.type = "triangle";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, start + i * 0.2);
+    gain.gain.exponentialRampToValueAtTime(0.18, start + i * 0.2 + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + i * 0.2 + 0.18);
+    osc.connect(gain).connect(audioContext.destination);
+    osc.start(start + i * 0.2);
+    osc.stop(start + i * 0.2 + 0.2);
+  });
+}
+
+function playCymbalSound() {
+  if (!audioContext) return;
+  const duration = 1.1;
+  const sampleRate = audioContext.sampleRate;
+  const bufferSize = sampleRate * duration;
+  const buffer = audioContext.createBuffer(1, bufferSize, sampleRate);
+  const data = buffer.getChannelData(0);
+
+  for (let i = 0; i < bufferSize; i += 1) {
+    const decay = 1 - i / bufferSize;
+    data[i] = (Math.random() * 2 - 1) * decay * decay;
+  }
+
+  const src = audioContext.createBufferSource();
+  src.buffer = buffer;
+
+  const highPass = audioContext.createBiquadFilter();
+  highPass.type = "highpass";
+  highPass.frequency.value = 3200;
+
+  const gain = audioContext.createGain();
+  gain.gain.value = 0.45;
+
+  src.connect(highPass).connect(gain).connect(audioContext.destination);
+  src.start();
+}
+
+function launchLetterShuffle() {
+  if (letterInterval) return;
+  letterInterval = setInterval(() => {
+    const randomLetter = letters[Math.floor(Math.random() * letters.length)];
+    letterDisplay.textContent = randomLetter.toUpperCase();
+  }, 62);
+}
+
+function stopLetterShuffle() {
+  clearInterval(letterInterval);
+  letterInterval = null;
+}
+
+function formatTime(totalSeconds) {
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+}
+
+function updateHourglass() {
+  const ratio = timerDuration > 0 ? timeLeft / timerDuration : 0;
+  const topHeight = Math.max(8, ratio * 74);
+  const bottomHeight = Math.max(10, (1 - ratio) * 74);
+  sandTop.style.height = `${topHeight}px`;
+  sandBottom.style.height = `${bottomHeight}px`;
+}
+
+function refreshTimerUI() {
+  timeReadout.textContent = formatTime(timeLeft);
+  updateHourglass();
+}
+
+function startTimer() {
+  if (isTimerRunning || timeLeft <= 0) return;
+  initAudio();
+  if (audioContext?.state === "suspended") {
+    audioContext.resume();
+  }
+  isTimerRunning = true;
+  hourglass.classList.add("flowing");
+
+  timerInterval = setInterval(() => {
+    timeLeft = Math.max(0, timeLeft - 1);
+    refreshTimerUI();
+
+    if (timeLeft === 15 && !warningPlayed) {
+      warningPlayed = true;
+      playWarningSong();
+    }
+
+    if (timeLeft === 0) {
+      stopTimer();
+      playCymbalSound();
+    }
+  }, 1000);
+}
+
+function stopTimer() {
+  isTimerRunning = false;
+  clearInterval(timerInterval);
+  timerInterval = null;
+  hourglass.classList.remove("flowing");
+}
+
+function setDuration(seconds) {
+  timerDuration = Math.max(5, seconds);
+  timeLeft = timerDuration;
+  warningPlayed = false;
+  stopTimer();
+  refreshTimerUI();
+}
+
+function updateScore(name, delta) {
+  gameState.scores[name] += delta;
+  const scoreSpan = document.getElementById(`score-${cssSafeId(name)}`);
+  scoreSpan.textContent = String(gameState.scores[name]);
+}
+
+playerCountInput.addEventListener("change", createPlayerInputs);
+playerCountInput.addEventListener("input", createPlayerInputs);
+
+setupForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  initAudio();
+
+  const difficulty = parseInt(difficultySelect.value, 10);
+  const categoryCount = Math.max(3, parseInt(categoryCountInput.value, 10) || 3);
+  const playerNames = [...playersFields.querySelectorAll("input")]
+    .map((input) => input.value.trim())
+    .filter(Boolean);
+
+  if (playerNames.length === 0) return;
+
+  gameState = {
+    ...gameState,
+    difficulty,
+    categoryCount,
+    players: playerNames,
+    scores: Object.fromEntries(playerNames.map((name) => [name, 0]))
+  };
+
+  pickCategories();
+  renderScoreboard();
+  setupPanel.classList.remove("active");
+  gamePanel.classList.add("active");
+});
+
+newRoundBtn.addEventListener("click", () => {
+  pickCategories();
+  setDuration(timerDuration);
+  launchLetterShuffle();
+  setTimeout(stopLetterShuffle, 1300);
+});
+
+editSetupBtn.addEventListener("click", () => {
+  stopTimer();
+  stopLetterShuffle();
+  gamePanel.classList.remove("active");
+  setupPanel.classList.add("active");
+});
+
+startLetterBtn.addEventListener("click", launchLetterShuffle);
+stopLetterBtn.addEventListener("click", stopLetterShuffle);
+
+durationPreset.addEventListener("change", () => {
+  const sec = parseInt(durationPreset.value, 10);
+  minutesInput.value = String(Math.floor(sec / 60));
+  secondsInput.value = String(sec % 60);
+  setDuration(sec);
+});
+
+applyDurationBtn.addEventListener("click", () => {
+  const minutes = parseInt(minutesInput.value, 10) || 0;
+  const seconds = parseInt(secondsInput.value, 10) || 0;
+  const total = Math.max(5, minutes * 60 + Math.min(59, Math.max(0, seconds)));
+  setDuration(total);
+});
+
+startTimerBtn.addEventListener("click", startTimer);
+pauseTimerBtn.addEventListener("click", stopTimer);
+resetTimerBtn.addEventListener("click", () => setDuration(timerDuration));
+
+scoreBoard.addEventListener("click", (event) => {
+  const btn = event.target.closest("button[data-name][data-delta]");
+  if (!btn) return;
+  updateScore(btn.dataset.name, Number(btn.dataset.delta));
+});
+
+createPlayerInputs();
+setDuration(timerDuration);

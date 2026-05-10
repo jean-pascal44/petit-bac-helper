@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Petit Bac Helper</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <h1>Petit Bac Helper</h1>
+        <p>Prepare les manches, tire une lettre, lance le sablier et compte les points.</p>
+      </header>
+
+      <section id="setupPanel" class="panel active">
+        <h2>Configuration de la partie</h2>
+        <form id="setupForm" class="grid-form">
+          <label for="difficulty">Niveau de difficulte (1 a 3)</label>
+          <select id="difficulty" required>
+            <option value="1">1 - Facile</option>
+            <option value="2">2 - Intermediaire</option>
+            <option value="3">3 - Difficile</option>
+          </select>
+
+          <label for="categoryCount">Nombre de categories (minimum 3)</label>
+          <input id="categoryCount" type="number" min="3" value="5" required />
+
+          <label for="playerCount">Nombre de joueurs</label>
+          <input id="playerCount" type="number" min="1" max="12" value="2" required />
+
+          <div id="playersFields" class="players-fields"></div>
+
+          <button type="submit" class="btn primary">Commencer la partie</button>
+        </form>
+      </section>
+
+      <section id="gamePanel" class="panel">
+        <div class="top-actions">
+          <button id="newRoundBtn" class="btn primary">Nouvelle manche</button>
+          <button id="editSetupBtn" class="btn ghost">Modifier la configuration</button>
+        </div>
+
+        <div class="game-grid">
+          <article class="card">
+            <h3>Categories de la manche</h3>
+            <ul id="categoriesList" class="categories-list"></ul>
+          </article>
+
+          <article class="card letter-card">
+            <h3>Lettre</h3>
+            <div id="letterDisplay" class="letter-display">A</div>
+            <div class="letter-actions">
+              <button id="startLetterBtn" class="btn primary">Lancer les lettres</button>
+              <button id="stopLetterBtn" class="btn danger">Stop</button>
+            </div>
+          </article>
+
+          <article class="card timer-card">
+            <h3>Sablier</h3>
+            <div class="duration-controls">
+              <label for="durationPreset">Duree predefinie</label>
+              <select id="durationPreset">
+                <option value="45">45 sec</option>
+                <option value="60" selected>1 min</option>
+                <option value="120">2 min</option>
+                <option value="150">2 min 30</option>
+                <option value="180">3 min</option>
+                <option value="240">4 min</option>
+              </select>
+            </div>
+            <div class="custom-duration">
+              <label for="minutesInput">Minutes</label>
+              <input id="minutesInput" type="number" min="0" max="10" value="1" />
+              <label for="secondsInput">Secondes</label>
+              <input id="secondsInput" type="number" min="0" max="59" value="0" />
+              <button id="applyDurationBtn" class="btn ghost">Appliquer</button>
+            </div>
+            <div class="time-readout" id="timeReadout">01:00</div>
+            <div class="hourglass">
+              <div class="glass top"></div>
+              <div class="glass bottom"></div>
+              <div id="sandTop" class="sand top-sand"></div>
+              <div id="sandBottom" class="sand bottom-sand"></div>
+              <div id="sandStream" class="sand-stream"></div>
+            </div>
+            <div class="timer-actions">
+              <button id="startTimerBtn" class="btn primary">Demarrer</button>
+              <button id="pauseTimerBtn" class="btn ghost">Pause</button>
+              <button id="resetTimerBtn" class="btn danger">Reinitialiser</button>
+            </div>
+          </article>
+        </div>
+
+        <article class="card scores-card">
+          <h3>Compteur de points</h3>
+          <div id="scoreBoard" class="score-board"></div>
+        </article>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>

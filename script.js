@@ -24,6 +24,11 @@ const resetScoresBtn = document.getElementById("resetScoresBtn");
 const scoreBoard = document.getElementById("scoreBoard");
 const vesselLiquid = document.getElementById("vesselLiquid");
 const timerVessel = document.getElementById("timerVessel");
+const confirmModal = document.getElementById("confirmModal");
+const confirmModalTitle = document.getElementById("confirmModalTitle");
+const confirmModalMessage = document.getElementById("confirmModalMessage");
+const confirmCancelBtn = document.getElementById("confirmCancelBtn");
+const confirmAcceptBtn = document.getElementById("confirmAcceptBtn");
 
 const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
@@ -100,6 +105,7 @@ let timeLeft = timerDuration;
 let warningSongInterval = null;
 let audioContext = null;
 const STORAGE_KEY = "petit-bac-helper-state-v1";
+let resolveConfirmModal = null;
 
 function createPlayerInputs(prefilledNames = []) {
   const count = Math.max(1, parseInt(playerCountInput.value || "1", 10));
@@ -337,6 +343,36 @@ function persistState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 }
 
+function askConfirmation(message, title = "Confirmation") {
+  if (!confirmModal || !confirmModalMessage || !confirmModalTitle) {
+    return Promise.resolve(false);
+  }
+
+  if (resolveConfirmModal) {
+    resolveConfirmModal(false);
+    resolveConfirmModal = null;
+  }
+
+  confirmModalTitle.textContent = title;
+  confirmModalMessage.textContent = message;
+  confirmModal.classList.add("open");
+  confirmModal.setAttribute("aria-hidden", "false");
+
+  return new Promise((resolve) => {
+    resolveConfirmModal = resolve;
+    confirmAcceptBtn.focus();
+  });
+}
+
+function closeConfirmModal(accepted) {
+  if (!resolveConfirmModal) return;
+  const resolver = resolveConfirmModal;
+  resolveConfirmModal = null;
+  confirmModal.classList.remove("open");
+  confirmModal.setAttribute("aria-hidden", "true");
+  resolver(accepted);
+}
+
 function hydrateFromStorage() {
   const saved = getPersistedState();
   if (!saved) return;
@@ -375,8 +411,11 @@ function hydrateFromStorage() {
   }
 }
 
-function clearSavedGame() {
-  const confirmed = window.confirm("Effacer la sauvegarde locale et remettre la partie a zero ?");
+async function clearSavedGame() {
+  const confirmed = await askConfirmation(
+    "Effacer la sauvegarde locale et remettre la partie a zero ?",
+    "Effacer la sauvegarde"
+  );
   if (!confirmed) return;
 
   localStorage.removeItem(STORAGE_KEY);
@@ -404,9 +443,12 @@ function clearSavedGame() {
   setupPanel.classList.add("active");
 }
 
-function resetScores() {
+async function resetScores() {
   if (gameState.players.length === 0) return;
-  const confirmed = window.confirm("Remettre tous les scores a zero ?");
+  const confirmed = await askConfirmation(
+    "Remettre tous les scores a zero ?",
+    "Reinitialiser les scores"
+  );
   if (!confirmed) return;
 
   gameState.scores = Object.fromEntries(gameState.players.map((name) => [name, 0]));
@@ -492,6 +534,18 @@ scoreBoard.addEventListener("click", (event) => {
 });
 clearStorageBtn.addEventListener("click", clearSavedGame);
 resetScoresBtn.addEventListener("click", resetScores);
+confirmCancelBtn.addEventListener("click", () => closeConfirmModal(false));
+confirmAcceptBtn.addEventListener("click", () => closeConfirmModal(true));
+confirmModal.addEventListener("click", (event) => {
+  if (event.target === confirmModal) {
+    closeConfirmModal(false);
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && confirmModal.classList.contains("open")) {
+    closeConfirmModal(false);
+  }
+});
 
 createPlayerInputs();
 setDuration(timerDuration, { persist: false });

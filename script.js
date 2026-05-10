@@ -94,7 +94,8 @@ let gameState = {
   difficulty: 1,
   categoryCount: 5,
   scores: {},
-  selectedCategories: []
+  selectedCategories: [],
+  usedLetters: []
 };
 
 let letterInterval = null;
@@ -245,15 +246,28 @@ function playGongSound() {
 
 function launchLetterShuffle() {
   if (letterInterval) return;
+  const available = letters.filter((letter) => !gameState.usedLetters.includes(letter));
+  if (available.length === 0) return;
+
   letterInterval = setInterval(() => {
-    const randomLetter = letters[Math.floor(Math.random() * letters.length)];
+    const pool = letters.filter((letter) => !gameState.usedLetters.includes(letter));
+    if (pool.length === 0) return;
+    const randomLetter = pool[Math.floor(Math.random() * pool.length)];
     letterDisplay.textContent = randomLetter.toUpperCase();
   }, 62);
 }
 
-function stopLetterShuffle() {
+function stopLetterShuffle(finalize = true) {
   clearInterval(letterInterval);
   letterInterval = null;
+  if (!finalize) return;
+
+  const currentLetter = String(letterDisplay.textContent || "").trim().toUpperCase();
+  if (!letters.includes(currentLetter)) return;
+  if (gameState.usedLetters.includes(currentLetter)) return;
+
+  gameState.usedLetters.push(currentLetter);
+  persistState();
 }
 
 function formatTime(totalSeconds) {
@@ -338,6 +352,7 @@ function persistState() {
     players: gameState.players,
     scores: gameState.scores,
     selectedCategories: gameState.selectedCategories,
+    usedLetters: gameState.usedLetters,
     timerDuration
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -379,6 +394,11 @@ function hydrateFromStorage() {
 
   const safePlayers = Array.isArray(saved.players) ? saved.players.filter(Boolean) : [];
   const safeScores = saved.scores && typeof saved.scores === "object" ? saved.scores : {};
+  const safeUsedLetters = Array.isArray(saved.usedLetters)
+    ? saved.usedLetters
+        .map((letter) => String(letter || "").toUpperCase())
+        .filter((letter) => letters.includes(letter))
+    : [];
   const safeDifficulty = [1, 2, 3].includes(saved.difficulty) ? saved.difficulty : 1;
   const safeCategoryCount = Math.max(3, Number(saved.categoryCount) || 5);
   const safeDuration = Math.max(5, Number(saved.timerDuration) || 60);
@@ -395,6 +415,7 @@ function hydrateFromStorage() {
     safePlayers.map((name) => [name, Number(safeScores[name] ?? 0)])
   );
   gameState.selectedCategories = Array.isArray(saved.selectedCategories) ? saved.selectedCategories : [];
+  gameState.usedLetters = [...new Set(safeUsedLetters)];
 
   setDuration(safeDuration, { persist: false });
   durationPreset.value = String(safeDuration);
@@ -420,13 +441,14 @@ async function clearSavedGame() {
 
   localStorage.removeItem(STORAGE_KEY);
   stopTimer();
-  stopLetterShuffle();
+  stopLetterShuffle(false);
   gameState = {
     players: [],
     difficulty: 1,
     categoryCount: 5,
     scores: {},
-    selectedCategories: []
+    selectedCategories: [],
+    usedLetters: []
   };
   difficultySelect.value = "1";
   categoryCountInput.value = "5";
@@ -452,6 +474,9 @@ async function resetScores() {
   if (!confirmed) return;
 
   gameState.scores = Object.fromEntries(gameState.players.map((name) => [name, 0]));
+  gameState.usedLetters = [];
+  stopLetterShuffle(false);
+  letterDisplay.textContent = "A";
   renderScoreboard();
   persistState();
 }
@@ -477,6 +502,7 @@ setupForm.addEventListener("submit", (event) => {
     difficulty,
     categoryCount,
     players: playerNames,
+    usedLetters: [],
     // Keep known scores for unchanged names, initialize only new players.
     scores: Object.fromEntries(
       playerNames.map((name) => [name, Number(previousScores[name] ?? 0)])
@@ -491,23 +517,29 @@ setupForm.addEventListener("submit", (event) => {
 });
 
 newRoundBtn.addEventListener("click", () => {
+  const available = letters.filter((letter) => !gameState.usedLetters.includes(letter));
+  if (available.length === 0) {
+    stopLetterShuffle(false);
+    return;
+  }
+
   pickCategories();
   persistState();
   setDuration(timerDuration);
   launchLetterShuffle();
-  setTimeout(stopLetterShuffle, 1300);
+  setTimeout(() => stopLetterShuffle(true), 1300);
 });
 
 editSetupBtn.addEventListener("click", () => {
   stopTimer();
-  stopLetterShuffle();
+  stopLetterShuffle(false);
   persistState();
   gamePanel.classList.remove("active");
   setupPanel.classList.add("active");
 });
 
 startLetterBtn.addEventListener("click", launchLetterShuffle);
-stopLetterBtn.addEventListener("click", stopLetterShuffle);
+stopLetterBtn.addEventListener("click", () => stopLetterShuffle(true));
 
 durationPreset.addEventListener("change", () => {
   const sec = parseInt(durationPreset.value, 10);

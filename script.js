@@ -105,6 +105,7 @@ let timerDuration = 60;
 let timeLeft = timerDuration;
 let warningSongInterval = null;
 let audioContext = null;
+let letterShuffleSoundInterval = null;
 const STORAGE_KEY = "petit-bac-helper-state-v1";
 let resolveConfirmModal = null;
 
@@ -244,10 +245,56 @@ function playGongSound() {
   src.start();
 }
 
+function playLetterShuffleStep() {
+  if (!audioContext) return;
+  const now = audioContext.currentTime;
+
+  const noiseBuffer = audioContext.createBuffer(1, Math.floor(audioContext.sampleRate * 0.08), audioContext.sampleRate);
+  const channel = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < channel.length; i += 1) {
+    channel[i] = (Math.random() * 2 - 1) * 0.45;
+  }
+
+  const source = audioContext.createBufferSource();
+  source.buffer = noiseBuffer;
+
+  const bandpass = audioContext.createBiquadFilter();
+  bandpass.type = "bandpass";
+  bandpass.frequency.setValueAtTime(1700, now);
+  bandpass.Q.value = 1.4;
+
+  const gain = audioContext.createGain();
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.05, now + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+
+  source.connect(bandpass).connect(gain).connect(audioContext.destination);
+  source.start(now);
+  source.stop(now + 0.09);
+}
+
+function startLetterShuffleSoundLoop() {
+  if (!audioContext || letterShuffleSoundInterval) return;
+  playLetterShuffleStep();
+  letterShuffleSoundInterval = setInterval(() => {
+    playLetterShuffleStep();
+  }, 95);
+}
+
+function stopLetterShuffleSoundLoop() {
+  clearInterval(letterShuffleSoundInterval);
+  letterShuffleSoundInterval = null;
+}
+
 function launchLetterShuffle() {
   if (letterInterval) return;
   const available = letters.filter((letter) => !gameState.usedLetters.includes(letter));
   if (available.length === 0) return;
+  initAudio();
+  if (audioContext?.state === "suspended") {
+    audioContext.resume();
+  }
+  startLetterShuffleSoundLoop();
 
   letterInterval = setInterval(() => {
     const pool = letters.filter((letter) => !gameState.usedLetters.includes(letter));
@@ -260,6 +307,7 @@ function launchLetterShuffle() {
 function stopLetterShuffle(finalize = true) {
   clearInterval(letterInterval);
   letterInterval = null;
+  stopLetterShuffleSoundLoop();
   if (!finalize) return;
 
   const currentLetter = String(letterDisplay.textContent || "").trim().toUpperCase();

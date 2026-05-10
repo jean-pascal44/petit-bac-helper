@@ -1,0 +1,19 @@
+{
+  "name": "Petit Bac Helper",
+  "short_name": "Petit Bac",
+  "description": "Prepare les manches, tire une lettre, lance le chrono et compte les points.",
+  "lang": "fr",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f6ecd8",
+  "theme_color": "#af3b3b",
+  "icons": [
+    {
+      "src": "icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -453,6 +453,15 @@ function closeConfirmModal(accepted) {
   resolver(accepted);
 }
 
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {
+      // Silently ignore registration errors in local dev.
+    });
+  });
+}
+
 function hydrateFromStorage() {
   const saved = getPersistedState();
   if (!saved) return;
@@ -647,3 +656,4 @@ document.addEventListener("keydown", (event) => {
 createPlayerInputs();
 setDuration(timerDuration, { persist: false });
 hydrateFromStorage();
+registerServiceWorker();
